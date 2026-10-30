@@ -23,6 +23,7 @@ export default class Stage {
     // both time params are measured in seconds
     update(elapsed, delta) {
         // call stage elements' update methods if necessary
+        this.environment?.update();
         this.network?.update(elapsed, delta);
     }
 }

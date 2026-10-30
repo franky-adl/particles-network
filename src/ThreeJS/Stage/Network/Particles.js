@@ -101,12 +101,12 @@ export default class Particles {
             vertexShader,
             fragmentShader,
             uniforms: {
-                uSize: { value: 0.05 }, // dot diameter, world units
+                uSize: { value: 0.068 }, // dot diameter, world units
                 uViewportHeight: { value: 0 }, // drawing-buffer height in px; set by resize()
                 uPixelRatio: { value: 1 }, // physical px per CSS px; set by resize()
                 uColor: { value: new THREE.Color("#d6dbff") },
                 uOpacity: { value: 0.9 },
-                uGlow: { value: 0.5 },
+                uGlow: { value: 0.1 },
                 // Depth-of-field blur params, shared with Lines (see Network).
                 ...this.dofUniforms,
             },

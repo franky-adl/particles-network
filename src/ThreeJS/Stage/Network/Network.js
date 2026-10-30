@@ -104,8 +104,8 @@ export default class Network {
             uFocusRange: { value: 0.8 },
             uAperture: { value: 2.6 },
             uMaxBlur: { value: 64 },
-            uBlurSoftness: { value: 1.0 },
-            uBlurEnergy: { value: 0.8 },
+            uBlurSoftness: { value: 0.3 },
+            uBlurEnergy: { value: 1.2 },
         };
         // Not a uniform: read in update() to drive uFocusDistance.
         this.dofParams = { autoFocus: false };
@@ -198,6 +198,9 @@ export default class Network {
         // Start at rest, then (re)build the GPU geometry for the dots.
         this.positions.set(this.basePositions);
         this.particles.setGeometry(this.positions, this.scales);
+        // Indices were just re-rolled, so leftover pair opacities would
+        // connect the wrong particles. Drop them and let lines fade in again.
+        this.lines.clearFadeEdges();
     }
 
     /**
@@ -312,7 +315,7 @@ export default class Network {
                 .add(this.dof.uBlurEnergy, "value")
                 .name("energy")
                 .min(0)
-                .max(1)
+                .max(2)
                 .step(0.001);
         }
     }
@@ -381,6 +384,6 @@ export default class Network {
         // `positions` has changed: re-upload it for the dots, and rebuild the
         // line list from whichever pairs are currently close enough.
         this.particles.update();
-        this.lines.update(this.positions, this.count);
+        this.lines.update(this.positions, this.count, delta);
     }
 }
