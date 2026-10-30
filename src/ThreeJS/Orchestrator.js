@@ -38,18 +38,23 @@ export default class Orchestrator {
         this.camera = new Camera();
         this.renderer = new Renderer();
 
-        // The main stage of the threejs experience,
-        // where the bulk of your scene objects and logic will live.
-        this.stage = new Stage();
-
-        // Stats
+        // Stats. Added before the stage so the toggle sits at the top of the GUI.
         if (this.debug.active) {
             this.stats = new Stats({ trackGPU: true });
             this.stats.dom.style.left = "0px";
             this.stats.dom.style.top = "0px";
             document.body.appendChild(this.stats.dom);
             void this.stats.init(this.renderer.instance);
+
+            this.params = { stats: true };
+            this.debug.ui.add(this.params, "stats").onChange((visible) => {
+                this.stats.dom.style.display = visible ? "" : "none";
+            });
         }
+
+        // The main stage of the threejs experience,
+        // where the bulk of your scene objects and logic will live.
+        this.stage = new Stage();
 
         // Resize event
         this.emitter.on("resize", () => {
