@@ -50,19 +50,29 @@ const STRIDE = 7;
  *                    more segments to draw; smaller = sparse, only very
  *                    close pairs connect. It also sets how gradual the
  *                    fade is: the fade spans 0 -> connectDistance.
+ *
+ * Depth of field: lines out of focus blur themselves. The vertex shader
+ * computes a circle of confusion at each end of the quad (from its depth) and
+ * widens the quad by it; the fragment shader softens and dims the edge. A line
+ * can therefore be sharp at one end and blurred at the other. The controls
+ * live in Network's "depth of field" GUI folder because Particles shares the
+ * same uniforms.
  */
 export default class Lines {
     /**
      * @param {THREE.Object3D} parent Where to attach the mesh (Network's group).
+     * @param {object} dofUniforms Depth-of-field uniforms shared with Particles
+     *        (created and exposed in the GUI by Network).
      */
-    constructor(parent) {
+    constructor(parent, dofUniforms) {
         this.orc = new Orchestrator();
         this.sizes = this.orc.sizes;
         this.debug = this.orc.debug;
         this.parent = parent;
+        this.dofUniforms = dofUniforms;
 
         this.params = {
-            connectDistance: 0.7,
+            connectDistance: 1,
         };
 
         // Finds the close pairs each frame (see update()).
@@ -155,9 +165,11 @@ export default class Lines {
             uniforms: {
                 uColor: { value: new THREE.Color("#262df2") },
                 uOpacity: { value: 0.6 },
-                uWidth: { value: 0.8 }, // thickness, CSS pixels
+                uWidth: { value: 1 }, // thickness, CSS pixels
                 uPixelRatio: { value: 1 },
                 uResolution: { value: new THREE.Vector2() }, // drawing buffer size, px
+                // Depth-of-field blur params, shared with Particles (see Network).
+                ...this.dofUniforms,
             },
             // Partially transparent, light-like look: additive blending lets
             // overlapping lines brighten where the web is dense.

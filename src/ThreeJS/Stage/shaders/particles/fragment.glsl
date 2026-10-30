@@ -1,19 +1,25 @@
 // Particles fragment shader: turns each square point sprite into a soft glowing dot.
+// Radii are in pixels, already enlarged by the depth-of-field blur in the vertex shader.
 // Used by src/ThreeJS/Stage/Network/Particles.js
 
 uniform vec3 uColor;    // dot + halo tint (GUI: particles > color)
 uniform float uOpacity; // overall transparency (GUI: particles > opacity)
 uniform float uGlow;    // halo strength (GUI: particles > glow)
 
-void main() {
-    // Distance from the sprite's centre: 0 at the middle, 0.5 at the edge midpoints.
-    float d = length(gl_PointCoord - 0.5);
+varying float vSize; // sprite diameter in px
+varying vec3 vCore;  // core disc:  x = radius px, y = edge softness px, z = brightness
+varying vec2 vHalo;  // halo:       x = radius px, y = brightness
 
-    // Core: solid disc with a slightly soft edge (full inside 0.06, gone by 0.14).
-    float core = 1.0 - smoothstep(0.06, 0.14, d);
-    // Halo: smooth falloff from centre to the sprite edge. The cubic power
+void main() {
+    // Distance from the sprite's centre, in pixels (0 at the middle).
+    float r = length(gl_PointCoord - 0.5) * vSize;
+
+    // Core: solid disc with a soft edge centred on its radius. When out of
+    // focus the disc is larger, its edge wider and its brightness lower.
+    float core = (1.0 - smoothstep(vCore.x - vCore.y, vCore.x + vCore.y, r)) * vCore.z;
+    // Halo: smooth falloff from the centre to its radius. The cubic power
     // concentrates the light near the core so it reads as a glow.
-    float halo = pow(1.0 - smoothstep(0.0, 0.5, d), 3.0) * uGlow;
+    float halo = pow(1.0 - smoothstep(0.0, vHalo.x, r), 3.0) * uGlow * vHalo.y;
 
     float alpha = (core + halo) * uOpacity;
     // Skip fully transparent pixels (the square's corners).

@@ -52,6 +52,24 @@ import Lines from "./Lines.js";
  *                   neighbours move independently (jittery).
  *     rotationSpeed Slow spin of the whole network around the Y axis, in
  *                   radians per second. Negative reverses direction.
+ *
+ *   Depth of field (this.dof, "depth of field" GUI subfolder) - an analytic
+ *   scattering blur done inside the Particles and Lines shaders themselves
+ *   (no post-processing). Each dot/line works out its circle of confusion
+ *   (CoC) from its distance to the camera and blurs itself. Both renderers
+ *   share these uniform objects, so one slider drives both. All live.
+ *     autoFocus     Keep the focus plane on the orbit target, so it follows
+ *                   you when you zoom or orbit. Overrides focusDistance.
+ *     focusDistance Distance from the camera (world units) that is sharp.
+ *     focusRange    Half-depth of the sharp zone around the focus plane.
+ *                   Larger = more of the web stays crisp.
+ *     aperture      Lens opening. 0 = no blur at all; higher = blur grows
+ *                   faster away from the focus plane.
+ *     maxBlur       Largest blur diameter in CSS pixels. Caps the cost and
+ *                   keeps very near dots from becoming huge discs.
+ *     softness      Bokeh edge: 0 = crisp disc, 1 = soft, scattered glow.
+ *     energy        0 = blurred things keep their brightness; 1 = they dim
+ *                   as their light spreads over a larger area (physical).
  */
 export default class Network {
     constructor() {
@@ -61,12 +79,12 @@ export default class Network {
 
         this.params = {
             // distribution (re-rolled by generate())
-            count: 1500,
+            count: 1000,
             spreadX: 7,
             spreadY: 6,
             spreadZ: 7,
-            clustering: 8,
-            clusterScale: 0.3,
+            clustering: 3,
+            clusterScale: 0.26,
             // motion (applied live every frame)
             speed: 0.12,
             amplitude: 0.35,
@@ -79,13 +97,26 @@ export default class Network {
         // Our own clock, advanced by delta * speed, which drives the noise's 4th dimension.
         this.time = 0;
 
+        // Depth-of-field uniforms. These exact objects are placed in both the
+        // Particles and Lines materials, so editing .value updates both.
+        this.dof = {
+            uFocusDistance: { value: 3.6 },
+            uFocusRange: { value: 0.8 },
+            uAperture: { value: 2.6 },
+            uMaxBlur: { value: 64 },
+            uBlurSoftness: { value: 1.0 },
+            uBlurEnergy: { value: 0.8 },
+        };
+        // Not a uniform: read in update() to drive uFocusDistance.
+        this.dofParams = { autoFocus: false };
+
         // Parent of everything we draw, so the whole network can be transformed as one.
         this.group = new THREE.Group();
         this.scene.add(this.group);
 
         // Lines is created before Particles so lines are added to the scene first.
-        this.lines = new Lines(this.group);
-        this.particles = new Particles(this.group);
+        this.lines = new Lines(this.group, this.dof);
+        this.particles = new Particles(this.group, this.dof);
 
         this.generate();
         this.setDebug();
@@ -241,6 +272,48 @@ export default class Network {
                 .min(-0.5)
                 .max(0.5)
                 .step(0.001);
+
+            // --- depth of field: shared uniforms, live ---
+            const dofFolder = this.debugFolder.addFolder("depth of field");
+            dofFolder.add(this.dofParams, "autoFocus");
+            // .listen() keeps the slider in sync while autoFocus drives it.
+            dofFolder
+                .add(this.dof.uFocusDistance, "value")
+                .name("focusDistance")
+                .min(0.1)
+                .max(20)
+                .step(0.01)
+                .listen();
+            dofFolder
+                .add(this.dof.uFocusRange, "value")
+                .name("focusRange")
+                .min(0)
+                .max(10)
+                .step(0.01);
+            dofFolder
+                .add(this.dof.uAperture, "value")
+                .name("aperture")
+                .min(0)
+                .max(3)
+                .step(0.001);
+            dofFolder
+                .add(this.dof.uMaxBlur, "value")
+                .name("maxBlur")
+                .min(0)
+                .max(64)
+                .step(0.1);
+            dofFolder
+                .add(this.dof.uBlurSoftness, "value")
+                .name("softness")
+                .min(0)
+                .max(1)
+                .step(0.001);
+            dofFolder
+                .add(this.dof.uBlurEnergy, "value")
+                .name("energy")
+                .min(0)
+                .max(1)
+                .step(0.001);
         }
     }
 
@@ -292,6 +365,14 @@ export default class Network {
                 by + this.motionNoise.noise4d(nx + 31.4, ny, nz, t) * amplitude;
             this.positions[i3 + 2] =
                 bz + this.motionNoise.noise4d(nx, ny + 47.2, nz, t) * amplitude;
+        }
+
+        // Keep the focus plane on the orbit target so it follows zoom/orbit.
+        if (this.dofParams.autoFocus) {
+            const { instance, controls } = this.orc.camera;
+            this.dof.uFocusDistance.value = instance.position.distanceTo(
+                controls.target,
+            );
         }
 
         // Slow spin of the whole network (dots and lines together).

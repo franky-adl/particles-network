@@ -2,6 +2,8 @@
 // to a fixed width in screen pixels.
 // Used by src/ThreeJS/Stage/Network/Lines.js
 
+#include "../dof/coc.glsl"
+
 uniform vec2 uResolution;  // drawing-buffer size in physical pixels
 uniform float uWidth;      // line thickness in CSS pixels (GUI: lines > thickness)
 uniform float uPixelRatio; // converts CSS pixels to physical pixels
@@ -13,6 +15,7 @@ attribute float instanceAlpha; // 0-1 fade based on how close the two particles 
 
 varying float vAlpha;
 varying float vEdge; // signed pixel distance from the line's centre, for anti-aliasing
+varying vec3 vBlur;  // x = half-width px, y = edge softness px, z = brightness (see main)
 
 // Moves `end` onto the near plane so segments crossing behind the camera
 // don't project with a flipped direction.
@@ -49,9 +52,26 @@ void main() {
     dir = length(dir) > 1e-4 ? normalize(dir) : vec2(1.0, 0.0);
     vec2 normal = vec2(-dir.y, dir.x);
 
-    // 1px of padding on each side leaves room for the anti-aliased edge.
-    float widthPx = max(uWidth * uPixelRatio, 1.0);
-    float halfQuad = widthPx * 0.5 + 1.0;
+    // --- Analytic scattering blur --------------------------------------------
+    // Depth (distance in front of the camera) at THIS corner: the quad's two
+    // ends sit at different depths, so one line can be sharp at one end and
+    // blurred at the other. The varyings below are interpolated along it.
+    float depth = -mix(start.z, end.z, position.x);
+    float coc = computeCoc(depth, uResolution.y, uPixelRatio);
+
+    float rawWidthPx = uWidth * uPixelRatio;
+    float sharpWidthPx = max(rawWidthPx, 1.0); // sub-pixel lines are drawn 1px wide...
+    float thinDimming = min(rawWidthPx, 1.0);  // ...and dimmed instead
+
+    // Blurring spreads a line sideways by the CoC: the strip gets wider by
+    // `coc` px, its edge softer, and (same light, bigger area) dimmer.
+    float halfWidthPx = 0.5 * (sharpWidthPx + coc);
+    float edgePx = 0.5 + uBlurSoftness * coc * 0.5; // 0.5 = plain 1px anti-aliasing
+    float energy = pow(sharpWidthPx / (sharpWidthPx + coc), uBlurEnergy);
+    vBlur = vec3(halfWidthPx, edgePx, thinDimming * energy);
+
+    // The quad must cover the blurred strip plus its soft edge.
+    float halfQuad = halfWidthPx + edgePx + 0.5;
     // position.y is -1 or 1 (which side of the line this corner is on).
     vEdge = position.y * halfQuad;
     vAlpha = instanceAlpha;

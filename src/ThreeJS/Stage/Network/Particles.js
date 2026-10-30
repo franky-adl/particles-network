@@ -32,16 +32,25 @@ import fragmentShader from "../shaders/particles/fragment.glsl";
  *   opacity  Overall transparency, 0 = invisible, 1 = fully opaque core.
  *   glow     Brightness of the soft halo around each core. 0 = hard little
  *            discs only; higher = bigger, brighter bloom-like halos.
+ *
+ * Depth of field: dots out of focus blur themselves. The vertex shader works
+ * out each dot's circle of confusion from its depth and enlarges the sprite;
+ * the fragment shader spreads the core and halo over that larger, softer
+ * area. The controls live in Network's "depth of field" GUI folder because
+ * Lines shares the same uniforms.
  */
 export default class Particles {
     /**
      * @param {THREE.Object3D} parent Where to attach the Points (Network's group).
+     * @param {object} dofUniforms Depth-of-field uniforms shared with Lines
+     *        (created and exposed in the GUI by Network).
      */
-    constructor(parent) {
+    constructor(parent, dofUniforms) {
         this.orc = new Orchestrator();
         this.sizes = this.orc.sizes;
         this.debug = this.orc.debug;
         this.parent = parent;
+        this.dofUniforms = dofUniforms;
 
         // The geometry is supplied later by Network.generate() via setGeometry(),
         // because it needs the particle positions, which Network creates.
@@ -92,11 +101,14 @@ export default class Particles {
             vertexShader,
             fragmentShader,
             uniforms: {
-                uSize: { value: 0.035 }, // dot diameter, world units
+                uSize: { value: 0.05 }, // dot diameter, world units
                 uViewportHeight: { value: 0 }, // drawing-buffer height in px; set by resize()
-                uColor: { value: new THREE.Color("#4ec5f4") },
+                uPixelRatio: { value: 1 }, // physical px per CSS px; set by resize()
+                uColor: { value: new THREE.Color("#d6dbff") },
                 uOpacity: { value: 0.9 },
-                uGlow: { value: 0.6 },
+                uGlow: { value: 0.5 },
+                // Depth-of-field blur params, shared with Lines (see Network).
+                ...this.dofUniforms,
             },
             // Partially transparent, light-like look (see class comment).
             transparent: true,
@@ -163,6 +175,7 @@ export default class Particles {
     resize() {
         this.material.uniforms.uViewportHeight.value =
             this.sizes.height * this.sizes.pixelRatio;
+        this.material.uniforms.uPixelRatio.value = this.sizes.pixelRatio;
     }
 
     /**
