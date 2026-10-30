@@ -4,13 +4,15 @@ A highly customizable 3D particle network visualization built with [Three.js](ht
 
 ![Particles Network](screencap.webp)
 
+Depth of field is an analytic circle-of-confusion blur, computed in the dot and line shaders directly. Each one measures its distance from the focal plane and scatters its own light across a disc of that size. Performance is even better than applying BokehPass as no postprocessing pipeline is needed and computation is more lightweight. Initially I've tried Three.js's [BokehPass](https://threejs.org/docs/#examples/en/postprocessing/BokehPass) but it did not work with the points/lines anyway as they never write depth properly.
+
 These can all be tweaked live through a [lil-gui](https://lil-gui.georgealways.com/) control panel:
 
 - **Distribution** — particle count, spread, clustering
 - **Motion** — speed, amplitude, noise scale, rotation
 - **Dots** — color, size, opacity, glow
 - **Lines** — near and far color, thickness, opacity, connection distance, connection cap, fade time
-- **Depth of field** — auto focus, focus distance and range, aperture, blur size, softness, energy
+- **Depth of field** — circle-of-confusion blur: auto focus, focus distance and range, aperture, blur size, softness, energy
 - **Sky** — zenith and opposite colors
 
 ## Setup
