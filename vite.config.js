@@ -4,6 +4,7 @@ import glsl from "vite-plugin-glsl";
 export default {
     root: "src/", // Sources files (typically where index.html is)
     publicDir: "../static/", // Path from "root" to static assets (files that are served as they are)
+    base: "/threejs/particles-network/",
     server: {
         host: true, // Open to local network and display URL
         open: !(
